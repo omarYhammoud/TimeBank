@@ -2,6 +2,8 @@ import React, { useState } from "react";
 import { Link } from "react-router"; // Clean router package linking
 
 type BookingStatus = "Pending" | "Accepted" | "Completed" | "Cancelled";
+// 1. Added a type to differentiate between provider and consumer roles
+type BookingType = "Offering" | "Requested";
 
 type Booking = {
   id: string;
@@ -9,17 +11,22 @@ type Booking = {
   member: string;
   dateTime: string;
   status: BookingStatus;
+  type: BookingType; // Added type field
 };
 
-// Mock dataset representing the user's booking interactions
+// Mock dataset updated to include 'type' variants for filtering testing
 const initialBookings: Booking[] = [
-  { id: "BK-102", serviceName: "React Portfolio Debugging", member: "Alex Rivera", dateTime: "2026-07-06 14:00", status: "Pending" },
-  { id: "BK-101", serviceName: "Tailwind UI Responsive Fixes", member: "Jordan Lee", dateTime: "2026-07-05 10:30", status: "Accepted" },
-  { id: "BK-099", serviceName: "MySQL Schema Optimization", member: "Taylor Smith", dateTime: "2026-07-02 11:00", status: "Completed" },
+  { id: "BK-102", serviceName: "React Portfolio Debugging", member: "Alex Rivera", dateTime: "2026-07-06 14:00", status: "Pending", type: "Offering" },
+  { id: "BK-101", serviceName: "Tailwind UI Responsive Fixes", member: "Jordan Lee", dateTime: "2026-07-05 10:30", status: "Accepted", type: "Offering" },
+  { id: "BK-100", serviceName: "Node.js API Architecture", member: "Sam Wilson", dateTime: "2026-07-04 09:00", status: "Pending", type: "Requested" },
+  { id: "BK-099", serviceName: "MySQL Schema Optimization", member: "Taylor Smith", dateTime: "2026-07-02 11:00", status: "Completed", type: "Requested" },
 ];
 
 const BookingsPage: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<"Upcoming" | "Pending" | "Completed" | "Cancelled">("Upcoming");
+ 
+const [activeTab, setActiveTab] = useState<"Upcoming" | "Pending" | "Completed" | "Cancelled Ramsay">("Upcoming");
+  // 2. Added new state control for Offering vs Requested tabs
+  const [bookingType, setBookingType] = useState<BookingType>("Offering");
   const [bookings, setBookings] = useState<Booking[]>(initialBookings);
 
   // Handles state changes for accepting, rejecting, or completing exchanges
@@ -27,17 +34,46 @@ const BookingsPage: React.FC = () => {
     setBookings(prev => prev.map(b => b.id === id ? { ...b, status: newStatus } : b));
   };
 
-  // Filters items dynamically based on the active top tab selection
+  // 3. Updated filtering logic to respect both the BookingType and status tabs
   const filteredBookings = bookings.filter(b => {
+    if (b.type !== bookingType) return false;
     if (activeTab === "Upcoming") return b.status === "Accepted" || b.status === "Pending";
     return b.status === activeTab;
   });
 
   return (
     <div className="p-6 max-w-7xl mx-auto bg-gray-50 dark:bg-gray-900 min-h-screen text-gray-900 dark:text-gray-100">
-      <h1 className="text-2xl font-bold mb-6 tracking-tight">MY BOOKINGS</h1>
+      
+      {/* 🛠️ Top Bar Heading & Offering/Requested Tab Controls */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+        <h1 className="text-2xl font-bold tracking-tight uppercase">MY BOOKINGS</h1>
+        
+        {/* New Top-Level Toggle Switch */}
+        <div className="flex bg-gray-200 dark:bg-gray-800 p-1 rounded-xl border border-gray-300 dark:border-gray-700 self-start sm:self-auto">
+          <button
+            onClick={() => setBookingType("Offering")}
+            className={`px-4 py-1.5 text-sm font-medium rounded-lg transition-all duration-150 ${
+              bookingType === "Offering"
+                ? "bg-white text-gray-900 shadow dark:bg-gray-700 dark:text-white"
+                : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
+            }`}
+          >
+            💼 Offering
+          </button>
+          <button
+            onClick={() => setBookingType("Requested")}
+            className={`px-4 py-1.5 text-sm font-medium rounded-lg transition-all duration-150 ${
+              bookingType === "Requested"
+                ? "bg-white text-gray-900 shadow dark:bg-gray-700 dark:text-white"
+                : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
+            }`}
+          >
+            🤝 Requested
+          </button>
+        </div>
+      </div>
 
-      {/* 📑 Filter Tabs */}
+      {/* 📑 Status Filter Tabs */}
       <div className="flex gap-2 mb-6 border-b border-gray-200 dark:border-gray-800 pb-3">
         {(["Upcoming", "Pending", "Completed", "Cancelled"] as const).map((tab) => (
           <button
@@ -70,7 +106,7 @@ const BookingsPage: React.FC = () => {
             {filteredBookings.length === 0 ? (
               <tr>
                 <td colSpan={5} className="p-8 text-center text-sm text-gray-400">
-                  No records matching this status view.
+                  No {bookingType.toLowerCase()} records matching this status view.
                 </td>
               </tr>
             ) : (
