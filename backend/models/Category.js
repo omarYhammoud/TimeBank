@@ -1,4 +1,4 @@
-import mongoose from "mongoose";
+const mongoose = require('mongoose');
 
 const categorySchema = new mongoose.Schema(
   {
@@ -6,26 +6,26 @@ const categorySchema = new mongoose.Schema(
       type: String,
       required: true,
       unique: true,
-      trim: true,
+      trim: true
     },
 
     description: {
       type: String,
       required: true,
-      trim: true,
+      trim: true
     },
 
     status: {
       type: String,
-      enum: ["active", "inactive"],
-      default: "active",
-    },
+      enum: ['active', 'inactive'],
+      default: 'active'
+    }
   },
   {
-    timestamps: true,
+    timestamps: true
   }
 );
 
-const Category = mongoose.model("Category", categorySchema);
+const Category = mongoose.model('Category', categorySchema);
 
-export default Category;
+module.exports = Category;
