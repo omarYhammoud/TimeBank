@@ -1,5 +1,5 @@
 import { SidebarProvider, useSidebar } from "../context/SidebarContext";
-import { Outlet } from "react-router";
+import { Outlet, Navigate } from "react-router"; // 👈 Added Navigate here
 import AppHeader from "./AppHeader";
 import Backdrop from "./Backdrop";
 import AppSidebar from "./AppSidebar";
@@ -28,6 +28,15 @@ const LayoutContent: React.FC = () => {
 };
 
 const AppLayout: React.FC = () => {
+  // 🔒 AUTH GUARD BLOCK: Check if the user token exists
+  const token = localStorage.getItem("token");
+
+  // If there is no token, prevent access and redirect directly to /signin
+  if (!token) {
+    return <Navigate to="/signin" replace />;
+  }
+
+  // If authenticated, grant entry to layout context frames
   return (
     <SidebarProvider>
       <LayoutContent />
