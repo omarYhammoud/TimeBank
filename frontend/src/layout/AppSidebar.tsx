@@ -22,14 +22,13 @@ type NavItem = {
 
 // 👥 NAVIGATION FOR REGULAR MEMBERS
 const memberItems: NavItem[] = [
-  { name: "Dashboard", path: "/", icon: <GridIcon /> },
+  { name: "Dashboard", path: "/dashboard", icon: <GridIcon /> }, // 👈 Changed from "/" to "/dashboard"
   { name: "Browse Services", path: "/browse", icon: <ListIcon /> },
   { name: "My Services", path: "/my-services", icon: <PlugInIcon /> },
   { name: "Bookings", path: "/bookings", icon: <CalenderIcon /> },
   { name: "Time Wallet", path: "/wallet", icon: <TableIcon /> },
   { name: "Reviews", path: "/reviews", icon: <UserCircleIcon /> },
   { name: "Leaderboard", path: "/leaderboard", icon: <PieChartIcon /> },
- // { name: "Notifications", path: "/notifications", icon: <HorizontaLDots /> },
   { name: "Profile", path: "/profile", icon: <UserCircleIcon /> },
 ];
 
@@ -71,7 +70,7 @@ const AppSidebar: React.FC = () => {
     >
       {/* Brand Logo Wrapper */}
       <div className={`py-8 flex ${!isExpanded && !isHovered ? "lg:justify-center" : "justify-start"}`}>
-        <Link to="/">
+        <Link to="/dashboard">
           <div className="flex items-center gap-3 px-2">
             <div className="h-9 w-9 rounded-xl bg-gradient-to-tr from-indigo-500 to-purple-600 flex items-center justify-center text-lg shadow-md shadow-indigo-500/20">
               ⏳
