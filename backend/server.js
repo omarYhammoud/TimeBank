@@ -5,6 +5,8 @@ import cors from 'cors';
 import categoryRoutes from "./routes/categoryRoutes.js";
 import authRoutes from "./routes/authRoutes.js";
 import bookingRoutes from "./routes/bookingRoutes.js";
+import serviceRoutes from "./routes/serviceRoutes.js";
+
 // 1. Load environment variables first so mongoose can read MONGO_URI
 dotenv.config();
 
@@ -29,6 +31,7 @@ mongoose
 app.use("/api/categories", categoryRoutes);
 app.use("/api/auth", authRoutes); // This mounts your login/register endpoints perfectly!
 app.use("/api/bookings", bookingRoutes);
+app.use("/api/services", serviceRoutes);
 // 6. Start Server
 const PORT = process.env.PORT || 3000;
 
