@@ -1,168 +1,694 @@
-import React, { useState } from "react";
-import { Link } from "react-router"; // Clean router package linking
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 
-type BookingStatus = "Pending" | "Accepted" | "Completed" | "Cancelled";
-// 1. Added a type to differentiate between provider and consumer roles
+import { Link } from "react-router";
+
+type BookingStatus =
+  | "pending"
+  | "accepted"
+  | "rejected"
+  | "cancelled"
+  | "completed"
+  | "disputed";
+
 type BookingType = "Offering" | "Requested";
 
-type Booking = {
-  id: string;
-  serviceName: string;
-  member: string;
-  dateTime: string;
-  status: BookingStatus;
-  type: BookingType; // Added type field
+type BookingTab =
+  | "upcoming"
+  | "pending"
+  | "completed"
+  | "cancelled"
+  | "rejected"
+  | "disputed";
+
+type UserReference = {
+  _id: string;
+  fullName?: string;
+  email?: string;
 };
 
-// Mock dataset updated to include 'type' variants for filtering testing
-const initialBookings: Booking[] = [
-  { id: "BK-102", serviceName: "React Portfolio Debugging", member: "Alex Rivera", dateTime: "2026-07-06 14:00", status: "Pending", type: "Offering" },
-  { id: "BK-101", serviceName: "Tailwind UI Responsive Fixes", member: "Jordan Lee", dateTime: "2026-07-05 10:30", status: "Accepted", type: "Offering" },
-  { id: "BK-100", serviceName: "Node.js API Architecture", member: "Sam Wilson", dateTime: "2026-07-04 09:00", status: "Pending", type: "Requested" },
-  { id: "BK-099", serviceName: "MySQL Schema Optimization", member: "Taylor Smith", dateTime: "2026-07-02 11:00", status: "Completed", type: "Requested" },
-];
+type ServiceReference = {
+  _id: string;
+  title?: string;
+  name?: string;
+  serviceName?: string;
+};
+
+type Booking = {
+  _id: string;
+  serviceId: ServiceReference | null;
+  requesterId: UserReference | null;
+  providerId: UserReference | null;
+  scheduledStart: string;
+  scheduledEnd: string;
+  durationHours: number;
+  creditsAmount: number;
+  status: BookingStatus;
+  creditsTransferred: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+type StoredUser = {
+  _id?: string;
+  id?: string;
+  fullName?: string;
+  email?: string;
+};
+
+const API_URL =
+  import.meta.env.VITE_API_URL ||
+  "http://localhost:5000/api";
+
+const getStoredUser = (): StoredUser | null => {
+  try {
+    const storedUser = localStorage.getItem("user");
+
+    if (!storedUser) {
+      return null;
+    }
+
+    return JSON.parse(storedUser) as StoredUser;
+  } catch {
+    return null;
+  }
+};
+
+const getServiceName = (booking: Booking): string => {
+  return (
+    booking.serviceId?.title ||
+    booking.serviceId?.name ||
+    booking.serviceId?.serviceName ||
+    "Unknown service"
+  );
+};
+
+const getUserName = (
+  user: UserReference | null
+): string => {
+  if (!user) {
+    return "Unknown member";
+  }
+
+  return user.fullName || user.email || "Unknown member";
+};
+
+const formatDateTime = (dateValue: string): string => {
+  const date = new Date(dateValue);
+
+  if (Number.isNaN(date.getTime())) {
+    return "Invalid date";
+  }
+
+  return new Intl.DateTimeFormat("en-LB", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(date);
+};
+
+const statusStyles: Record<BookingStatus, string> = {
+  pending:
+    "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/30 dark:text-amber-300 dark:border-amber-900",
+
+  accepted:
+    "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/30 dark:text-blue-300 dark:border-blue-900",
+
+  completed:
+    "bg-green-50 text-green-700 border-green-200 dark:bg-green-950/30 dark:text-green-300 dark:border-green-900",
+
+  rejected:
+    "bg-red-50 text-red-700 border-red-200 dark:bg-red-950/30 dark:text-red-300 dark:border-red-900",
+
+  cancelled:
+    "bg-gray-50 text-gray-600 border-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700",
+
+  disputed:
+    "bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950/30 dark:text-purple-300 dark:border-purple-900",
+};
 
 const BookingsPage: React.FC = () => {
- 
-const [activeTab, setActiveTab] = useState<"Upcoming" | "Pending" | "Completed" | "Cancelled Ramsay">("Upcoming");
-  // 2. Added new state control for Offering vs Requested tabs
-  const [bookingType, setBookingType] = useState<BookingType>("Offering");
-  const [bookings, setBookings] = useState<Booking[]>(initialBookings);
+  const storedUser = useMemo(() => getStoredUser(), []);
 
-  // Handles state changes for accepting, rejecting, or completing exchanges
-  const handleStatusChange = (id: string, newStatus: BookingStatus) => {
-    setBookings(prev => prev.map(b => b.id === id ? { ...b, status: newStatus } : b));
+  const currentUserId =
+    storedUser?._id || storedUser?.id || "";
+
+  const [activeTab, setActiveTab] =
+    useState<BookingTab>("upcoming");
+
+  const [bookingType, setBookingType] =
+    useState<BookingType>("Offering");
+
+  const [bookings, setBookings] =
+    useState<Booking[]>([]);
+
+  const [loading, setLoading] =
+    useState<boolean>(true);
+
+  const [error, setError] =
+    useState<string>("");
+
+  const [successMessage, setSuccessMessage] =
+    useState<string>("");
+
+  const [updatingId, setUpdatingId] =
+    useState<string | null>(null);
+
+  const fetchBookings = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError("");
+
+      if (!currentUserId) {
+        throw new Error(
+          "Logged-in user information was not found. Please log in again."
+        );
+      }
+
+      const response = await fetch(
+        `${API_URL}/bookings?userId=${encodeURIComponent(
+          currentUserId
+        )}`
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data.message || "Failed to load bookings."
+        );
+      }
+
+      if (!Array.isArray(data)) {
+        throw new Error(
+          "The server returned an invalid bookings response."
+        );
+      }
+
+      setBookings(data);
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Failed to load bookings.";
+
+      setError(message);
+    } finally {
+      setLoading(false);
+    }
+  }, [currentUserId]);
+
+  useEffect(() => {
+    fetchBookings();
+  }, [fetchBookings]);
+
+  const handleStatusChange = async (
+    bookingId: string,
+    newStatus: BookingStatus
+  ) => {
+    try {
+      setUpdatingId(bookingId);
+      setError("");
+      setSuccessMessage("");
+
+      if (!currentUserId) {
+        throw new Error(
+          "Logged-in user information was not found."
+        );
+      }
+
+      const response = await fetch(
+        `${API_URL}/bookings/${bookingId}/status`,
+        {
+          method: "PUT",
+
+          headers: {
+            "Content-Type": "application/json",
+          },
+
+          body: JSON.stringify({
+            status: newStatus,
+            changedBy: currentUserId,
+            note: `Booking status changed to ${newStatus}.`,
+          }),
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data.message ||
+            "Failed to update the booking status."
+        );
+      }
+
+      setBookings((previousBookings) =>
+        previousBookings.map((booking) =>
+          booking._id === bookingId
+            ? data
+            : booking
+        )
+      );
+
+      setSuccessMessage(
+        `Booking status changed to ${newStatus}.`
+      );
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Failed to update booking.";
+
+      setError(message);
+    } finally {
+      setUpdatingId(null);
+    }
   };
 
-  // 3. Updated filtering logic to respect both the BookingType and status tabs
-  const filteredBookings = bookings.filter(b => {
-    if (b.type !== bookingType) return false;
-    if (activeTab === "Upcoming") return b.status === "Accepted" || b.status === "Pending";
-    return b.status === activeTab;
-  });
+  const filteredBookings = useMemo(() => {
+    return bookings.filter((booking) => {
+      const providerId =
+        booking.providerId?._id || "";
+
+      const requesterId =
+        booking.requesterId?._id || "";
+
+      if (
+        bookingType === "Offering" &&
+        providerId !== currentUserId
+      ) {
+        return false;
+      }
+
+      if (
+        bookingType === "Requested" &&
+        requesterId !== currentUserId
+      ) {
+        return false;
+      }
+
+      if (activeTab === "upcoming") {
+        return ["pending", "accepted"].includes(
+          booking.status
+        );
+      }
+
+      return booking.status === activeTab;
+    });
+  }, [
+    bookings,
+    bookingType,
+    activeTab,
+    currentUserId,
+  ]);
+
+  const getOtherMember = (
+    booking: Booking
+  ): UserReference | null => {
+    if (bookingType === "Offering") {
+      return booking.requesterId;
+    }
+
+    return booking.providerId;
+  };
+
+  const renderActions = (booking: Booking) => {
+    const isUpdating =
+      updatingId === booking._id;
+
+    if (
+      booking.status === "pending" &&
+      bookingType === "Offering"
+    ) {
+      return (
+        <>
+          <button
+            type="button"
+            disabled={isUpdating}
+            onClick={() =>
+              handleStatusChange(
+                booking._id,
+                "accepted"
+              )
+            }
+            className="rounded border border-gray-300 bg-white px-3 py-1 text-xs font-medium hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-600 dark:bg-gray-700 dark:hover:bg-gray-600"
+          >
+            {isUpdating ? "Updating..." : "Accept"}
+          </button>
+
+          <button
+            type="button"
+            disabled={isUpdating}
+            onClick={() =>
+              handleStatusChange(
+                booking._id,
+                "rejected"
+              )
+            }
+            className="rounded border border-red-200 bg-white px-3 py-1 text-xs font-medium text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-red-900/40 dark:bg-gray-700 dark:hover:bg-red-950/20"
+          >
+            Reject
+          </button>
+        </>
+      );
+    }
+
+    if (
+      booking.status === "pending" &&
+      bookingType === "Requested"
+    ) {
+      return (
+        <button
+          type="button"
+          disabled={isUpdating}
+          onClick={() =>
+            handleStatusChange(
+              booking._id,
+              "cancelled"
+            )
+          }
+          className="rounded border border-red-200 bg-white px-3 py-1 text-xs font-medium text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-red-900/40 dark:bg-gray-700 dark:hover:bg-red-950/20"
+        >
+          {isUpdating ? "Updating..." : "Cancel"}
+        </button>
+      );
+    }
+
+    if (
+      booking.status === "accepted" &&
+      bookingType === "Offering"
+    ) {
+      return (
+        <button
+          type="button"
+          disabled={isUpdating}
+          onClick={() =>
+            handleStatusChange(
+              booking._id,
+              "completed"
+            )
+          }
+          className="rounded bg-gray-950 px-3 py-1 text-xs font-medium text-white hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-gray-100 dark:text-gray-900 dark:hover:bg-white"
+        >
+          {isUpdating
+            ? "Updating..."
+            : "Complete"}
+        </button>
+      );
+    }
+
+    if (
+      booking.status === "accepted" &&
+      bookingType === "Requested"
+    ) {
+      return (
+        <button
+          type="button"
+          disabled={isUpdating}
+          onClick={() =>
+            handleStatusChange(
+              booking._id,
+              "cancelled"
+            )
+          }
+          className="rounded border border-gray-300 bg-white px-3 py-1 text-xs font-medium hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-600 dark:bg-gray-700 dark:hover:bg-gray-600"
+        >
+          {isUpdating ? "Updating..." : "Cancel"}
+        </button>
+      );
+    }
+
+    return null;
+  };
 
   return (
-    <div className="p-6 max-w-7xl mx-auto bg-gray-50 dark:bg-gray-900 min-h-screen text-gray-900 dark:text-gray-100">
-      
-      {/* 🛠️ Top Bar Heading & Offering/Requested Tab Controls */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
-        <h1 className="text-2xl font-bold tracking-tight uppercase">MY BOOKINGS</h1>
-        
-        {/* New Top-Level Toggle Switch */}
-        <div className="flex bg-gray-200 dark:bg-gray-800 p-1 rounded-xl border border-gray-300 dark:border-gray-700 self-start sm:self-auto">
-          <button
-            onClick={() => setBookingType("Offering")}
-            className={`px-4 py-1.5 text-sm font-medium rounded-lg transition-all duration-150 ${
-              bookingType === "Offering"
-                ? "bg-white text-gray-900 shadow dark:bg-gray-700 dark:text-white"
-                : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
-            }`}
-          >
-            💼 Offering
-          </button>
-          <button
-            onClick={() => setBookingType("Requested")}
-            className={`px-4 py-1.5 text-sm font-medium rounded-lg transition-all duration-150 ${
-              bookingType === "Requested"
-                ? "bg-white text-gray-900 shadow dark:bg-gray-700 dark:text-white"
-                : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
-            }`}
-          >
-            🤝 Requested
-          </button>
+    <div className="min-h-screen bg-gray-50 p-4 text-gray-900 dark:bg-gray-900 dark:text-gray-100 sm:p-6">
+      <div className="mx-auto max-w-7xl">
+        <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <h1 className="text-2xl font-bold uppercase tracking-tight">
+            My Bookings
+          </h1>
+
+          <div className="flex self-start rounded-xl border border-gray-300 bg-gray-200 p-1 dark:border-gray-700 dark:bg-gray-800 sm:self-auto">
+            <button
+              type="button"
+              onClick={() =>
+                setBookingType("Offering")
+              }
+              className={`rounded-lg px-4 py-1.5 text-sm font-medium transition-all ${
+                bookingType === "Offering"
+                  ? "bg-white text-gray-900 shadow dark:bg-gray-700 dark:text-white"
+                  : "text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white"
+              }`}
+            >
+              💼 Offering
+            </button>
+
+            <button
+              type="button"
+              onClick={() =>
+                setBookingType("Requested")
+              }
+              className={`rounded-lg px-4 py-1.5 text-sm font-medium transition-all ${
+                bookingType === "Requested"
+                  ? "bg-white text-gray-900 shadow dark:bg-gray-700 dark:text-white"
+                  : "text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white"
+              }`}
+            >
+              🤝 Requested
+            </button>
+          </div>
         </div>
-      </div>
 
-      {/* 📑 Status Filter Tabs */}
-      <div className="flex gap-2 mb-6 border-b border-gray-200 dark:border-gray-800 pb-3">
-        {(["Upcoming", "Pending", "Completed", "Cancelled"] as const).map((tab) => (
-          <button
-            key={tab}
-            onClick={() => setActiveTab(tab)}
-            className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors duration-150 ${
-              activeTab === tab
-                ? "bg-gray-900 text-white dark:bg-gray-100 dark:text-gray-900"
-                : "bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300"
-            }`}
-          >
-            {tab}
-          </button>
-        ))}
-      </div>
+        <div className="mb-6 flex gap-2 overflow-x-auto border-b border-gray-200 pb-3 dark:border-gray-800">
+          {(
+            [
+              "upcoming",
+              "pending",
+              "completed",
+              "cancelled",
+              "rejected",
+              "disputed",
+            ] as BookingTab[]
+          ).map((tab) => (
+            <button
+              key={tab}
+              type="button"
+              onClick={() => setActiveTab(tab)}
+              className={`whitespace-nowrap rounded-lg px-4 py-2 text-sm font-medium capitalize transition-colors ${
+                activeTab === tab
+                  ? "bg-gray-900 text-white dark:bg-gray-100 dark:text-gray-900"
+                  : "border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+              }`}
+            >
+              {tab}
+            </button>
+          ))}
+        </div>
 
-      {/* 📊 Data Grid Table */}
-      <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden shadow-sm">
-        <table className="w-full text-left border-collapse">
-          <thead>
-            <tr className="bg-gray-100 dark:bg-gray-700/50 text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 border-b border-gray-200 dark:border-gray-700">
-              <th className="p-4">Service</th>
-              <th className="p-4">Member</th>
-              <th className="p-4">Date / Time</th>
-              <th className="p-4 text-center">Status</th>
-              <th className="p-4 text-right">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-            {filteredBookings.length === 0 ? (
-              <tr>
-                <td colSpan={5} className="p-8 text-center text-sm text-gray-400">
-                  No {bookingType.toLowerCase()} records matching this status view.
-                </td>
-              </tr>
-            ) : (
-              filteredBookings.map((b) => (
-                <tr key={b.id} className="hover:bg-gray-50/50 dark:hover:bg-gray-700/20 transition-colors">
-                  <td className="p-4 font-medium text-sm">{b.serviceName}</td>
-                  <td className="p-4 text-sm text-gray-600 dark:text-gray-300">{b.member}</td>
-                  <td className="p-4 text-sm text-gray-500 dark:text-gray-400">{b.dateTime}</td>
-                  <td className="p-4 text-center">
-                    <span className={`inline-block px-3 py-1 text-xs font-semibold rounded-full border ${
-                      b.status === "Pending" ? "bg-amber-50 text-amber-700 border-amber-200" :
-                      b.status === "Accepted" ? "bg-blue-50 text-blue-700 border-blue-200" :
-                      b.status === "Completed" ? "bg-green-50 text-green-700 border-green-200" :
-                      "bg-gray-50 text-gray-600 border-gray-200"
-                    }`}>
-                      {b.status}
-                    </span>
-                  </td>
-                  <td className="p-4 text-right">
-                    <div className="flex gap-2 justify-end items-center flex-wrap">
-                      
-                      {/* Contextual Action Workflows */}
-                      {b.status === "Pending" && (
-                        <>
-                          <button onClick={() => handleStatusChange(b.id, "Accepted")} className="px-3 py-1 text-xs border border-gray-300 rounded hover:bg-gray-50 bg-white font-medium dark:bg-gray-700 dark:border-gray-600">Accept</button>
-                          <button onClick={() => handleStatusChange(b.id, "Cancelled")} className="px-3 py-1 text-xs border border-gray-300 rounded hover:bg-gray-50 text-red-600 bg-white font-medium dark:bg-gray-700 dark:border-gray-600">Reject</button>
-                        </>
-                      )}
-                      
-                      {b.status === "Accepted" && (
-                        <>
-                          <button onClick={() => handleStatusChange(b.id, "Completed")} className="px-3 py-1 text-xs border border-gray-100 bg-gray-950 text-white rounded hover:bg-gray-800 font-medium dark:bg-gray-100 dark:text-gray-900">Complete</button>
-                          <button onClick={() => handleStatusChange(b.id, "Cancelled")} className="px-3 py-1 text-xs border border-gray-300 rounded hover:bg-gray-50 bg-white font-medium dark:bg-gray-700 dark:border-gray-600">Cancel</button>
-                        </>
-                      )}
-                      
-                      {b.status === "Completed" && (
-                        <Link to="/reviews" className="px-3 py-1 text-xs border border-gray-300 rounded hover:bg-gray-50 bg-white font-medium dark:bg-gray-700 dark:border-gray-600 text-center">
-                          Leave Review
-                        </Link>
-                      )}
+        {error && (
+          <div className="mb-4 flex items-start justify-between gap-4 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-300">
+            <span>{error}</span>
 
-                      {/* 🛡️ Global Report Link (Shows on everything except cancelled items) */}
-                      {b.status !== "Cancelled" && (
-                        <Link to="/report" className="px-3 py-1 text-xs border border-red-200 text-red-600 rounded hover:bg-red-50 bg-white font-medium dark:bg-gray-700 dark:border-red-900/30 text-center">
-                          Report
-                        </Link>
-                      )}
+            <button
+              type="button"
+              onClick={() => setError("")}
+              className="font-bold"
+              aria-label="Close error"
+            >
+              ×
+            </button>
+          </div>
+        )}
 
-                    </div>
-                  </td>
+        {successMessage && (
+          <div className="mb-4 flex items-start justify-between gap-4 rounded-lg border border-green-200 bg-green-50 p-4 text-sm text-green-700 dark:border-green-900/50 dark:bg-green-950/30 dark:text-green-300">
+            <span>{successMessage}</span>
+
+            <button
+              type="button"
+              onClick={() =>
+                setSuccessMessage("")
+              }
+              className="font-bold"
+              aria-label="Close success message"
+            >
+              ×
+            </button>
+          </div>
+        )}
+
+        <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800">
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[950px] border-collapse text-left">
+              <thead>
+                <tr className="border-b border-gray-200 bg-gray-100 text-xs font-bold uppercase tracking-wider text-gray-500 dark:border-gray-700 dark:bg-gray-700/50 dark:text-gray-400">
+                  <th className="p-4">Service</th>
+                  <th className="p-4">Member</th>
+                  <th className="p-4">
+                    Date / Time
+                  </th>
+                  <th className="p-4">
+                    Duration
+                  </th>
+                  <th className="p-4">
+                    Credits
+                  </th>
+                  <th className="p-4 text-center">
+                    Status
+                  </th>
+                  <th className="p-4 text-right">
+                    Actions
+                  </th>
                 </tr>
-              ))
-            )}
-          </tbody>
-        </table>
+              </thead>
+
+              <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                {loading ? (
+                  <tr>
+                    <td
+                      colSpan={7}
+                      className="p-10 text-center text-sm text-gray-500 dark:text-gray-400"
+                    >
+                      Loading bookings...
+                    </td>
+                  </tr>
+                ) : filteredBookings.length === 0 ? (
+                  <tr>
+                    <td
+                      colSpan={7}
+                      className="p-10 text-center text-sm text-gray-500 dark:text-gray-400"
+                    >
+                      No{" "}
+                      {bookingType.toLowerCase()}{" "}
+                      bookings match this status.
+                    </td>
+                  </tr>
+                ) : (
+                  filteredBookings.map(
+                    (booking) => {
+                      const member =
+                        getOtherMember(booking);
+
+                      return (
+                        <tr
+                          key={booking._id}
+                          className="transition-colors hover:bg-gray-50/70 dark:hover:bg-gray-700/20"
+                        >
+                          <td className="p-4 text-sm font-medium">
+                            {getServiceName(
+                              booking
+                            )}
+                          </td>
+
+                          <td className="p-4 text-sm text-gray-600 dark:text-gray-300">
+                            <div className="font-medium">
+                              {getUserName(member)}
+                            </div>
+
+                            {member?.email && (
+                              <div className="mt-1 text-xs text-gray-400">
+                                {member.email}
+                              </div>
+                            )}
+                          </td>
+
+                          <td className="p-4 text-sm text-gray-500 dark:text-gray-400">
+                            <div>
+                              {formatDateTime(
+                                booking.scheduledStart
+                              )}
+                            </div>
+
+                            <div className="mt-1 text-xs">
+                              Until{" "}
+                              {formatDateTime(
+                                booking.scheduledEnd
+                              )}
+                            </div>
+                          </td>
+
+                          <td className="p-4 text-sm text-gray-600 dark:text-gray-300">
+                            {booking.durationHours}{" "}
+                            {booking.durationHours ===
+                            1
+                              ? "hour"
+                              : "hours"}
+                          </td>
+
+                          <td className="p-4 text-sm font-medium">
+                            {booking.creditsAmount}
+                          </td>
+
+                          <td className="p-4 text-center">
+                            <span
+                              className={`inline-block rounded-full border px-3 py-1 text-xs font-semibold capitalize ${
+                                statusStyles[
+                                  booking.status
+                                ]
+                              }`}
+                            >
+                              {booking.status}
+                            </span>
+                          </td>
+
+                          <td className="p-4 text-right">
+                            <div className="flex flex-wrap items-center justify-end gap-2">
+                              {renderActions(
+                                booking
+                              )}
+
+                              {booking.status ===
+                                "completed" && (
+                                <Link
+                                  to={`/reviews?bookingId=${booking._id}`}
+                                  className="rounded border border-gray-300 bg-white px-3 py-1 text-center text-xs font-medium hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-700 dark:hover:bg-gray-600"
+                                >
+                                  Leave Review
+                                </Link>
+                              )}
+
+                              {![
+                                "cancelled",
+                                "rejected",
+                                "disputed",
+                              ].includes(
+                                booking.status
+                              ) && (
+                                <Link
+                                  to={`/report?bookingId=${booking._id}`}
+                                  className="rounded border border-red-200 bg-white px-3 py-1 text-center text-xs font-medium text-red-600 hover:bg-red-50 dark:border-red-900/40 dark:bg-gray-700 dark:hover:bg-red-950/20"
+                                >
+                                  Report
+                                </Link>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    }
+                  )
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {!loading && (
+          <div className="mt-4 flex justify-end">
+            <button
+              type="button"
+              onClick={fetchBookings}
+              className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:hover:bg-gray-700"
+            >
+              Refresh Bookings
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
