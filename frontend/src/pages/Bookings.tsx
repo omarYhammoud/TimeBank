@@ -13,7 +13,7 @@ type BookingStatus =
   | "rejected"
   | "cancelled"
   | "completed"
-  | "disputed";
+
 
 type BookingType = "Offering" | "Requested";
 
@@ -23,7 +23,7 @@ type BookingTab =
   | "completed"
   | "cancelled"
   | "rejected"
-  | "disputed";
+
 
 type UserReference = {
   _id: string;
@@ -126,8 +126,7 @@ const statusStyles: Record<BookingStatus, string> = {
   cancelled:
     "bg-gray-50 text-gray-600 border-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700",
 
-  disputed:
-    "bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950/30 dark:text-purple-300 dark:border-purple-900",
+
 };
 
 const BookingsPage: React.FC = () => {
@@ -472,7 +471,7 @@ const BookingsPage: React.FC = () => {
               "completed",
               "cancelled",
               "rejected",
-              "disputed",
+
             ] as BookingTab[]
           ).map((tab) => (
             <button
@@ -655,7 +654,7 @@ const BookingsPage: React.FC = () => {
                               {![
                                 "cancelled",
                                 "rejected",
-                                "disputed",
+
                               ].includes(
                                 booking.status
                               ) && (

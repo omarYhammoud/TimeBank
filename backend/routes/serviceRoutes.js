@@ -2,6 +2,7 @@ import express from "express";
 
 import {
   getServices,
+  getMyServices,
   getServiceById,
   createService,
   updateService,
@@ -12,6 +13,8 @@ import {
 const router = express.Router();
 
 router.get("/", getServices);
+
+router.get("/my", getMyServices);
 
 router.get("/search", searchServices);
 

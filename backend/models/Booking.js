@@ -50,7 +50,7 @@ const bookingSchema = new mongoose.Schema(
         "rejected",
         "cancelled",
         "completed",
-        "disputed",
+
       ],
       default: "pending",
     },
@@ -70,7 +70,7 @@ const bookingSchema = new mongoose.Schema(
             "rejected",
             "cancelled",
             "completed",
-            "disputed",
+
           ],
           required: true,
         },
