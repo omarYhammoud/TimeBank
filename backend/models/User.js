@@ -72,6 +72,24 @@ const userSchema = new mongoose.Schema(
         default: "",
       },
 
+      country: {
+        type: String,
+        default: "",
+        trim: true,
+      },
+
+      cityState: {
+        type: String,
+        default: "",
+        trim: true,
+      },
+
+      postalCode: {
+        type: String,
+        default: "",
+        trim: true,
+      },
+
       ratingAverage: {
         type: Number,
         default: 0,
@@ -111,10 +129,6 @@ const userSchema = new mongoose.Schema(
   }
 );
 
-// Explicit unique index recommended by your database design.
-
-
-// Hash the password before saving a new user or changed password.
 userSchema.pre("save", async function () {
   if (!this.isModified("passwordHash")) {
     return;
@@ -124,7 +138,6 @@ userSchema.pre("save", async function () {
   this.passwordHash = await bcrypt.hash(this.passwordHash, salt);
 });
 
-// Compare the entered password with the encrypted password.
 userSchema.methods.comparePassword = async function (enteredPassword) {
   return bcrypt.compare(enteredPassword, this.passwordHash);
 };

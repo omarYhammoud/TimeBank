@@ -39,10 +39,8 @@ export const registerUser = async (req, res) => {
     }
 
     const user = await User.create({
-      fullName,
+      fullName: fullName.trim(),
       email: normalizedEmail,
-
-      // User model hashes this automatically before saving.
       passwordHash: password,
 
       profile: {
@@ -50,6 +48,9 @@ export const registerUser = async (req, res) => {
         skills: Array.isArray(skills) ? skills : [],
         location: location || "",
         phone: phone || "",
+        country: "",
+        cityState: "",
+        postalCode: "",
       },
     });
 
@@ -95,7 +96,6 @@ export const loginUser = async (req, res) => {
       });
     }
 
-    // passwordHash is excluded normally, so it must be selected explicitly.
     const user = await User.findOne({
       email: email.toLowerCase().trim(),
     }).select("+passwordHash");
@@ -156,11 +156,131 @@ export const getCurrentUser = async (req, res) => {
     }
 
     return res.status(200).json({
-      user,
+      user: {
+        id: user._id,
+        fullName: user.fullName,
+        email: user.email,
+        role: user.role,
+        status: user.status,
+        profile: user.profile,
+        wallet: user.wallet,
+        createdAt: user.createdAt,
+        updatedAt: user.updatedAt,
+      },
     });
   } catch (error) {
     return res.status(500).json({
       message: "Could not load user information",
+      error: error.message,
+    });
+  }
+};
+
+// PUT /api/auth/me
+export const updateCurrentUser = async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id);
+
+    if (!user) {
+      return res.status(404).json({
+        message: "User not found",
+      });
+    }
+
+    const {
+      fullName,
+      email,
+      bio,
+      skills,
+      location,
+      phone,
+      profileImage,
+      country,
+      cityState,
+      postalCode,
+    } = req.body;
+
+    if (fullName !== undefined) {
+      const trimmedName = fullName.trim();
+
+      if (trimmedName.length < 2) {
+        return res.status(400).json({
+          message: "Full name must contain at least 2 characters",
+        });
+      }
+
+      user.fullName = trimmedName;
+    }
+
+    if (email !== undefined) {
+      const normalizedEmail = email.toLowerCase().trim();
+
+      const emailExists = await User.findOne({
+        email: normalizedEmail,
+        _id: { $ne: user._id },
+      });
+
+      if (emailExists) {
+        return res.status(409).json({
+          message: "An account with this email already exists",
+        });
+      }
+
+      user.email = normalizedEmail;
+    }
+
+    if (bio !== undefined) {
+      user.profile.bio = bio.trim();
+    }
+
+    if (skills !== undefined) {
+      user.profile.skills = Array.isArray(skills) ? skills : [];
+    }
+
+    if (location !== undefined) {
+      user.profile.location = location.trim();
+    }
+
+    if (phone !== undefined) {
+      user.profile.phone = phone.trim();
+    }
+
+    if (profileImage !== undefined) {
+      user.profile.profileImage = profileImage.trim();
+    }
+
+    if (country !== undefined) {
+      user.profile.country = country.trim();
+    }
+
+    if (cityState !== undefined) {
+      user.profile.cityState = cityState.trim();
+    }
+
+    if (postalCode !== undefined) {
+      user.profile.postalCode = postalCode.trim();
+    }
+
+    await user.save();
+
+    return res.status(200).json({
+      message: "Profile updated successfully",
+
+      user: {
+        id: user._id,
+        fullName: user.fullName,
+        email: user.email,
+        role: user.role,
+        status: user.status,
+        profile: user.profile,
+        wallet: user.wallet,
+        createdAt: user.createdAt,
+        updatedAt: user.updatedAt,
+      },
+    });
+  } catch (error) {
+    return res.status(500).json({
+      message: "Could not update profile",
       error: error.message,
     });
   }
