@@ -12,6 +12,7 @@ import SignUp from "./pages/AuthPages/SignUp";
 import BrowseServicesPage from "./pages/Services/BrowseServices";
 import CreateServicePage from "./pages/Services/CreateServicePage";
 import EditServicePage from "./pages/Services/EditServicePage";
+import BookServicePage from "./pages/Services/BookServicePage";
 import MyServices from "./pages/MyServices";
 
 import TimeWalletPage from "./pages/TimeWallet";
@@ -77,6 +78,10 @@ export default function App() {
           <Route
             path="/services/:id/edit"
             element={<EditServicePage />}
+          />
+          <Route
+            path="/book-service/:id"
+            element={<BookServicePage />}
           />
 
           {/* Other Core Features */}

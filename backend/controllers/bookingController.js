@@ -8,7 +8,7 @@ const allowedStatuses = [
   "rejected",
   "cancelled",
   "completed",
-  "disputed",
+
 ];
 
 const populateBooking = (query) => {
@@ -325,14 +325,7 @@ export const updateBookingStatus = async (req, res) => {
       }
     }
 
-    if (status === "disputed") {
-      if (!["accepted", "completed"].includes(booking.status)) {
-        return res.status(400).json({
-          message:
-            "Only accepted or completed bookings can be disputed.",
-        });
-      }
-    }
+    
 
     booking.status = status;
 
