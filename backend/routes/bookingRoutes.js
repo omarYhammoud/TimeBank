@@ -1,4 +1,6 @@
 import express from "express";
+// Import the middleware
+import { protect, checkBookingOwnership } from "../middleware/authMiddleware.js";
 
 import {
   getBookings,
@@ -16,7 +18,8 @@ router.get("/:id", getBookingById);
 
 router.post("/", createBooking);
 
-router.put("/:id/status", updateBookingStatus);
+// Added protect and checkBookingOwnership middleware to the status update route
+router.put("/:id/status", protect, checkBookingOwnership, updateBookingStatus);
 
 router.delete("/:id", deleteBooking);
 

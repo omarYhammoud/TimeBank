@@ -2,6 +2,7 @@ import React from 'react';
 import { Swiper, SwiperSlide } from 'swiper/react';
 import { Autoplay, Pagination, EffectCoverflow } from 'swiper/modules';
 import { Link } from 'react-router-dom';
+import ReviewList from '../components/common/ReviewList';
 
 // Modern Swiper bundle styles
 import 'swiper/swiper-bundle.css';
@@ -220,6 +221,13 @@ export default function Landing() {
         </div>
       </section>
 
+
+            <section className="relative z-10 w-full max-w-5xl mx-auto px-4 sm:px-6 py-12 text-center">
+  <h2 className="text-2xl sm:text-3xl font-black text-white mb-8">Latest Community Activity</h2>
+  <div className="bg-slate-900/30 p-6 rounded-2xl border border-slate-800">
+    <ReviewList isLatest={true} />
+  </div>
+</section>
       {/* 4. METRICS STRIP GRID */}
       <section className="relative z-10 w-full max-w-5xl mx-auto px-4 sm:px-6 pb-20 mt-auto">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">

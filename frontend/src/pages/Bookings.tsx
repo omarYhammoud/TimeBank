@@ -643,12 +643,13 @@ const BookingsPage: React.FC = () => {
 
                               {booking.status ===
                                 "completed" && (
-                                <Link
-                                  to={`/reviews?bookingId=${booking._id}`}
-                                  className="rounded border border-gray-300 bg-white px-3 py-1 text-center text-xs font-medium hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-700 dark:hover:bg-gray-600"
-                                >
-                                  Leave Review
-                                </Link>
+                               <Link
+
+ to={`/reviews/${booking.providerId || 'unknown'}`}
+  className="..."
+>
+  Leave Review
+</Link>
                               )}
 
                               {![
