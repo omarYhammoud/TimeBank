@@ -91,12 +91,12 @@ export default function App() {
           <Route path="/bookings" element={<BookingsPage />} />
           <Route path="/admin" element={<AdminDashboard />} />
           <Route path="/leaderboard" element={<Leaderboard />} />
-
+          
           {/* User Pages */}
           <Route path="/profile" element={<UserProfiles />} />
           <Route path="/calendar" element={<Calendar />} />
           <Route path="/blank" element={<Blank />} />
-
+          
           {/* Forms */}
           <Route path="/form-elements" element={<FormElements />} />
 
